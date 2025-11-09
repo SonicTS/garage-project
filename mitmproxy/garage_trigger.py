@@ -1,82 +1,84 @@
-"""mitmproxy addon that watches flows and triggers the garage-controller.
+"""mitmproxy addon: log all HTTP(S) traffic for analysis.
 
-Skeleton implementation: fill in the actual trigger condition logic.
+Use this first to observe the real requests/responses and decide on a trigger pattern later.
 
-Usage (example):
+Run example:
     mitmdump --mode socks5 --listen-host 0.0.0.0 --listen-port 1080 -s garage_trigger.py
 
-TODO:
-- Define trigger condition (URL pattern, headers, body substring, etc.).
-- Consider rate limiting / debouncing multiple triggers.
-- Add logging (structured?) if needed.
+Notes:
+- Bodies are truncated to avoid huge logs. Adjust MAX_BODY_LOG if needed.
+- Remove/adjust header/body logging if the data may include secrets.
 """
 
-from typing import Any, Dict
-import requests  # mitmproxy runs in CPython; requests is acceptable for simplicity.
+from typing import Optional
+from mitmproxy import ctx
 
 # NOTE: mitmproxy provides the Flow object with request/response details.
 
+MAX_BODY_LOG = 2048  # bytes/characters to log from bodies
+
 
 class GarageTrigger:
-    """Addon that inspects HTTP requests and POSTs to a local trigger endpoint.
+    """Logs request/response details for every flow.
 
-    Args:
-        trigger_device: Device name to include in JSON payload (e.g., 'brother').
-        trigger_url: Local URL for garage-controller /trigger endpoint.
-        condition_hint: Human-readable description of what should match (for doc purposes).
+    Later you can convert this to detect a pattern and call a local trigger.
     """
 
-    def __init__(self, trigger_device: str = "brother", trigger_url: str = "http://127.0.0.1:5001/trigger", condition_hint: str = "TODO: describe condition"):
-        self.trigger_device = trigger_device
-        self.trigger_url = trigger_url
-        self.condition_hint = condition_hint
-    # Initialize placeholder for rate limiting state if needed.
+    def __init__(self):
+        ctx.log.info("[garage_logger] Initialized. Logging all flows.")
 
     def request(self, flow):  # mitmproxy hook
-        """Called when a client request has been received.
-
-        Use flow.request to inspect:
-            - flow.request.pretty_url
-            - flow.request.method
-            - flow.request.headers
-            - flow.request.get_text() (body as string)
-
-        TODO: Replace placeholder condition with real logic.
-        """
+        """Log inbound client request details."""
         try:
-            _url = flow.request.pretty_url
-            _method = flow.request.method
+            url = flow.request.pretty_url
+            method = flow.request.method
+            ctx.log.info(f"[REQ] {method} {url}")
 
-            # Define the actual trigger condition here (URL match, method, header or body snippet).
-            trigger_condition = False
+            # Headers
+            for k, v in flow.request.headers.items():
+                ctx.log.info(f"[REQ][H] {k}: {v}")
 
-            # Example placeholder logic:
-            # if "example_endpoint" in url and method == "POST":
-            #     trigger_condition = True
-
-            if trigger_condition:
-                payload: Dict[str, Any] = {"device": self.trigger_device}
-                # Optional: include additional metadata from the flow if needed.
-                self._fire_trigger(payload)
-        except Exception as ex:  # Broad catch to prevent crashing addon; refine as needed.
-            # Simple print; replace with logging framework if desired.
-            print(f"[garage_trigger] Exception during request inspection: {ex}")
-
-    def _fire_trigger(self, payload: Dict[str, Any]) -> None:
-        """
-        POST to the local trigger URL with JSON payload.
-
-        Consider rate limiting and error backoff in future enhancements.
-        """
-        try:
-            resp = requests.post(self.trigger_url, json=payload, timeout=2)
-            if resp.status_code != 200:
-                print(f"[garage_trigger] Trigger POST non-200: {resp.status_code} body={resp.text}")
+            # Body (truncate for safety)
+            body_text: Optional[str] = None
+            try:
+                body_text = flow.request.get_text()
+            except Exception:
+                body_text = None
+            if body_text:
+                snippet = body_text[:MAX_BODY_LOG]
+                if len(body_text) > MAX_BODY_LOG:
+                    snippet += "\n... [truncated]"
+                ctx.log.info(f"[REQ][B] {snippet}")
             else:
-                print(f"[garage_trigger] Triggered for device={payload.get('device')}")
-        except requests.RequestException as rex:
-            print(f"[garage_trigger] Request error posting trigger: {rex}")
+                # If binary or empty, log size if available
+                size = len(flow.request.raw_content) if flow.request.raw_content else 0
+                ctx.log.info(f"[REQ][B] <no text body> size={size} bytes")
+        except Exception as ex:  # Keep addon resilient
+            ctx.log.warn(f"[garage_logger] Error logging request: {ex}")
+
+    def response(self, flow):  # mitmproxy hook
+        """Log server response details."""
+        try:
+            status = flow.response.status_code if flow.response else -1
+            ctype = flow.response.headers.get("content-type", "") if flow.response else ""
+            size = len(flow.response.raw_content) if flow.response and flow.response.raw_content else 0
+            ctx.log.info(f"[RES] {status} {ctype} size={size}")
+
+            body_text: Optional[str] = None
+            try:
+                body_text = flow.response.get_text()
+            except Exception:
+                body_text = None
+            if body_text:
+                snippet = body_text[:MAX_BODY_LOG]
+                if len(body_text) > MAX_BODY_LOG:
+                    snippet += "\n... [truncated]"
+                ctx.log.info(f"[RES][B] {snippet}")
+            else:
+                ctx.log.info("[RES][B] <no text body or binary>")
+        except Exception as ex:
+            ctx.log.warn(f"[garage_logger] Error logging response: {ex}")
 
 
 # Export list for mitmproxy to recognize addons
-addons = [GarageTrigger()]  # Pass custom args if needed: GarageTrigger(trigger_device="brother")
+addons = [GarageTrigger()]

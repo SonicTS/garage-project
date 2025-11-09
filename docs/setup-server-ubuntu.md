@@ -69,10 +69,25 @@ sudo chown mitmproxy:mitmproxy /opt/blaulicht/mitmproxy
 sudo rsync -av blaulicht-garage-proxy/mitmproxy/ /opt/blaulicht/mitmproxy/
 ```
 
-Test manually (optional):
+Test manually (optional) without persistent logging:
 
 ```bash
 sudo -u mitmproxy mitmdump --mode socks5 --listen-host 0.0.0.0 --listen-port 1080 -s /opt/blaulicht/mitmproxy/garage_trigger.py
+```
+
+Enable file logging (recommended for pattern analysis):
+
+```bash
+sudo -u mitmproxy mitmdump --mode socks5 --listen-host 0.0.0.0 --listen-port 1080 \
+	-s /opt/blaulicht/mitmproxy/garage_trigger.py \
+	--set logfile=/var/log/mitmproxy/mitmproxy.log --set console_eventlog_verbosity=info
+```
+
+Create and own the log directory (if not using systemd unit to do it):
+
+```bash
+sudo mkdir -p /var/log/mitmproxy
+sudo chown mitmproxy:mitmproxy /var/log/mitmproxy
 ```
 
 > TODO: Confirm the Android app’s per-app VPN points to this server’s IP and port 1080.
@@ -146,8 +161,27 @@ Export mitmproxy CA certificate (mitmproxy generates it on first run in `~/.mitm
 
 ## 10. Monitoring & Logs (Optional)
 
-- Tail logs: `journalctl -u mitmproxy -f` and `journalctl -u garage-controller -f`
-- Consider log rotation and minimal structured logging.
+- Tail logs (systemd journal):
+	- `journalctl -u mitmproxy -f`
+	- `journalctl -u garage-controller -f`
+- File logs (if using `--set logfile=/var/log/mitmproxy/mitmproxy.log`):
+	- `tail -f /var/log/mitmproxy/mitmproxy.log`
+- Add log rotation (example `/etc/logrotate.d/mitmproxy`):
+
+```bash
+sudo tee /etc/logrotate.d/mitmproxy >/dev/null <<'EOF'
+/var/log/mitmproxy/mitmproxy.log {
+		daily
+		rotate 7
+		compress
+		missingok
+		notifempty
+		create 640 mitmproxy mitmproxy
+}
+EOF
+```
+
+- Consider minimal structured logging or filtering sensitive headers before writing to disk.
 
 ## 11. TODO / Hardening Ideas
 
