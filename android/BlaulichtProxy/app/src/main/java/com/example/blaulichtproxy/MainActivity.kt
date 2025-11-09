@@ -3,6 +3,9 @@ package com.example.blaulichtproxy
 import android.app.Activity
 import android.content.Intent
 import android.net.VpnService
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.IntentFilter
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -18,9 +21,11 @@ import com.example.blaulichtproxy.vpn.AppVpnService
 class MainActivity : ComponentActivity() {
 
     // UI state for fields
-    private var proxyHost by mutableStateOf("192.168.1.50")          // later: your DDNS name
-    private var proxyPort by mutableStateOf("1080")
+    private var proxyHost by mutableStateOf("minecraftwgwg.hopto.org")          // later: your DDNS name
+    private var proxyPort by mutableStateOf("8281")
     private var targetPkg by mutableStateOf("net.ut11.ccmp.blaulicht")
+    private var vpnState by mutableStateOf("INACTIVE")
+    private var isStarting by mutableStateOf(false)
 
     // VPN permission launcher
     private val vpnPrep = registerForActivityResult(
@@ -33,7 +38,13 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        registerReceiver(stateReceiver, IntentFilter(AppVpnService.ACTION_STATE))
         setContent { Ui() }
+    }
+
+    override fun onDestroy() {
+        unregisterReceiver(stateReceiver)
+        super.onDestroy()
     }
 
     @Composable
@@ -62,13 +73,16 @@ class MainActivity : ComponentActivity() {
                     singleLine = true
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Button(onClick = { ensureVpnPermissionThenStart() }) {
+                    val canStart = vpnState == "INACTIVE" && !isStarting
+                    val canStop = vpnState == "CONNECTING" || vpnState == "CONNECTED" || isStarting
+                    Button(onClick = { ensureVpnPermissionThenStart() }, enabled = canStart) {
                         Text("Start VPN")
                     }
-                    OutlinedButton(onClick = { stopVpn() }) {
+                    OutlinedButton(onClick = { stopVpn() }, enabled = canStop) {
                         Text("Stop VPN")
                     }
                 }
+                Text(text = "State: $vpnState")
             }
         }
     }
@@ -93,7 +107,7 @@ class MainActivity : ComponentActivity() {
      */
     private fun startVpnService() {
         val host = proxyHost.trim()
-        val port = proxyPort.toIntOrNull() ?: 1080
+        val port = proxyPort.toIntOrNull() ?: 8281
         val pkg  = targetPkg.trim()
 
         val i = Intent(this, AppVpnService::class.java).apply {
@@ -102,6 +116,7 @@ class MainActivity : ComponentActivity() {
             putExtra(AppVpnService.EXTRA_PROXY_PORT, port)
             putExtra(AppVpnService.EXTRA_TARGET_PKG, pkg)
         }
+        isStarting = true
         startService(i)
     }
 
@@ -113,5 +128,17 @@ class MainActivity : ComponentActivity() {
             action = AppVpnService.ACTION_STOP
         }
         startService(i)
+    }
+
+    private val stateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == AppVpnService.ACTION_STATE) {
+                val s = intent.getStringExtra(AppVpnService.EXTRA_STATE) ?: return
+                vpnState = s
+                if (s == "CONNECTED" || s == "INACTIVE" || s == "ERROR") {
+                    isStarting = false
+                }
+            }
+        }
     }
 }

@@ -42,7 +42,7 @@ sudo chown garage:garage /opt/garage-controller
 Copy the repository subtree (from your development machine or git clone) into `/opt/garage-controller`. Example:
 
 ```bash
-sudo rsync -av blaulicht-garage-proxy/garage-controller/ /opt/garage-controller/
+sudo rsync -av ./garage-controller/ /opt/garage-controller/
 ```
 
 Create and populate virtual environment:
@@ -65,41 +65,30 @@ Run mitmproxy as the `mitmproxy` user. The addon script should reside under an o
 
 ```bash
 sudo mkdir -p /opt/blaulicht/mitmproxy
-sudo chown mitmproxy:mitmproxy /opt/blaulicht/mitmproxy
-sudo rsync -av blaulicht-garage-proxy/mitmproxy/ /opt/blaulicht/mitmproxy/
+sudo chown -R mitmproxy:mitmproxy /opt/blaulicht/mitmproxy
+# (Old approach) If using a confdir inside /opt: sudo -u mitmproxy mkdir -p /opt/blaulicht/mitmproxy/.mitmproxy
+# New recommended approach relies on systemd StateDirectory=mitmproxy which auto-creates /var/lib/mitmproxy
+sudo rsync -av ./mitmproxy/ /opt/blaulicht/mitmproxy/
 ```
 
-Test manually (optional) without persistent logging:
+Test manually (optional) – explicitly set a writable confdir because system users often have HOME=/nonexistent:
 
 ```bash
-sudo -u mitmproxy mitmdump --mode socks5 --listen-host 0.0.0.0 --listen-port 1080 -s /opt/blaulicht/mitmproxy/garage_trigger.py
+sudo -u mitmproxy mitmdump --set confdir=/var/lib/mitmproxy --mode socks5 --listen-host 0.0.0.0 --listen-port 8281 -s /opt/blaulicht/mitmproxy/garage_trigger.py
 ```
 
-Enable file logging (recommended for pattern analysis):
-
-```bash
-sudo -u mitmproxy mitmdump --mode socks5 --listen-host 0.0.0.0 --listen-port 1080 \
-	-s /opt/blaulicht/mitmproxy/garage_trigger.py \
-	--set logfile=/var/log/mitmproxy/mitmproxy.log --set console_eventlog_verbosity=info
-```
-
-Create and own the log directory (if not using systemd unit to do it):
-
-```bash
-sudo mkdir -p /var/log/mitmproxy
-sudo chown mitmproxy:mitmproxy /var/log/mitmproxy
-```
-
-> TODO: Confirm the Android app’s per-app VPN points to this server’s IP and port 1080.
+> TODO: Confirm the Android app’s per-app VPN points to this server’s IP and port 8281.
 
 ## 6. systemd Units
 
 Copy unit files:
 
 ```bash
-sudo cp blaulicht-garage-proxy/infra/systemd/mitmproxy.service /etc/systemd/system/
-sudo cp blaulicht-garage-proxy/infra/systemd/garage-controller.service /etc/systemd/system/
+sudo cp ./infra/systemd/mitmproxy.service /etc/systemd/system/
+sudo cp ./infra/systemd/garage-controller.service /etc/systemd/system/
 ```
+
+With the updated unit file including `StateDirectory=mitmproxy`, systemd will create `/var/lib/mitmproxy` automatically at start. No manual confdir creation is needed. If you are on the old unit file, create the legacy path manually.
 
 Reload and enable:
 
@@ -123,7 +112,7 @@ Goal: Expose only `/garage/poll` over HTTPS; keep `/trigger` private on localhos
 Place the config:
 
 ```bash
-sudo cp blaulicht-garage-proxy/infra/nginx/garage.conf /etc/nginx/sites-available/garage.conf
+sudo cp ./infra/nginx/garage.conf /etc/nginx/sites-available/garage.conf
 sudo ln -s /etc/nginx/sites-available/garage.conf /etc/nginx/sites-enabled/garage.conf
 ```
 
@@ -147,7 +136,7 @@ Basic example (adjust to your threat model):
 ```bash
 sudo ufw default deny incoming
 sudo ufw default allow outgoing
-sudo ufw allow proto tcp from <YOUR_PHONE_IP> to any port 1080   # SOCKS5 (restricted)
+sudo ufw allow proto tcp from <YOUR_PHONE_IP> to any port 8281   # SOCKS5 (restricted)
 sudo ufw allow 443/tcp                                         # HTTPS for /garage/poll
 sudo ufw allow ssh                                             # Consider restricting source IPs
 sudo ufw enable

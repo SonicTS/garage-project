@@ -31,6 +31,17 @@ class AppVpnService : VpnService() {
         const val ACTION_START = "com.example.blaulichtproxy.action.START_VPN"
         const val ACTION_STOP  = "com.example.blaulichtproxy.action.STOP_VPN"
 
+        // Broadcast updates so UI can reflect state
+        const val ACTION_STATE = "com.example.blaulichtproxy.action.VPN_STATE"
+        const val EXTRA_STATE  = "state"
+        const val EXTRA_MESSAGE = "message"
+
+        // States
+        const val STATE_INACTIVE = "INACTIVE"
+        const val STATE_CONNECTING = "CONNECTING"
+        const val STATE_CONNECTED = "CONNECTED"
+        const val STATE_ERROR = "ERROR"
+
         private const val CH_ID = "vpn_channel"
         private const val N_ID = 42
         private const val TAG = "AppVpnService"
@@ -57,6 +68,7 @@ class AppVpnService : VpnService() {
                 // Remove our foreground notification
                 stopForeground(STOP_FOREGROUND_REMOVE)
 
+                sendState(STATE_INACTIVE, "Stopped")
                 // Stop the service (will also tear down the VPN)
                 stopSelf()
                 return START_NOT_STICKY
@@ -65,16 +77,18 @@ class AppVpnService : VpnService() {
 
         // --- existing START logic below here (unchanged) ---
         val host = intent?.getStringExtra(EXTRA_PROXY_HOST) ?: return START_NOT_STICKY
-        val port = intent.getIntExtra(EXTRA_PROXY_PORT, 1080)
+        val port = intent.getIntExtra(EXTRA_PROXY_PORT, 8281)
         val pkg  = intent.getStringExtra(EXTRA_TARGET_PKG).orEmpty()
 
-        Log.d(TAG, "onStartCommand: ACTION_START host=$host port=$port targetPkg=$pkg")
+    Log.d(TAG, "onStartCommand: ACTION_START host=$host port=$port targetPkg=$pkg")
 
         if (isRunning) {
             Log.d(TAG, "VPN already running, ignoring duplicate start")
+            sendState(STATE_CONNECTED, "Already running")
             return START_STICKY
         }
         isRunning = true
+        sendState(STATE_CONNECTING, "Connecting $pkg via $host:$port")
 
         // "Connecting..." foreground notification
         showNotification("Connecting $pkg via $host:$port")
@@ -122,6 +136,7 @@ class AppVpnService : VpnService() {
             if (!canReachProxy(host, port)) {
                 Log.e(TAG, "Preflight: cannot reach $host:$port, stopping.")
                 showNotification("Proxy $host:$port unreachable")
+                sendState(STATE_ERROR, "Proxy unreachable")
                 stopSelf()
                 return@Thread
             }
@@ -133,9 +148,11 @@ class AppVpnService : VpnService() {
                 tunnel = h
                 Log.d(TAG, "Tun2Socks: started OK")
                 showNotification("Connected $pkg via $host:$port")
+                sendState(STATE_CONNECTED, "Connected $pkg")
             } catch (t: Throwable) {
                 Log.e(TAG, "Tun2Socks: FAILED", t)
                 showNotification("Error starting VPN: ${t.message}")
+                sendState(STATE_ERROR, t.message ?: "Unknown error")
                 stopSelf()
             }
         }.start()
@@ -145,6 +162,7 @@ class AppVpnService : VpnService() {
             if (tunnel == null && isRunning) {
                 Log.e(TAG, "WATCHDOG: tun2socks did not start in 10s → stopping VPN")
                 showNotification("VPN failed to start")
+                sendState(STATE_ERROR, "Startup timeout")
                 stopSelf()
             }
         }, 10_000)
@@ -160,6 +178,7 @@ class AppVpnService : VpnService() {
         runCatching { pfd?.close() }
         pfd = null
         stopForeground(STOP_FOREGROUND_REMOVE)
+        sendState(STATE_INACTIVE, "Destroyed")
         super.onDestroy()
     }
 
@@ -214,5 +233,13 @@ class AppVpnService : VpnService() {
     private fun showNotification(text: String) {
         val nm = getSystemService(NotificationManager::class.java)
         nm.notify(N_ID, buildNotification(text))
+    }
+
+    private fun sendState(state: String, message: String? = null) {
+        val i = Intent(ACTION_STATE).apply {
+            putExtra(EXTRA_STATE, state)
+            message?.let { putExtra(EXTRA_MESSAGE, it) }
+        }
+        sendBroadcast(i)
     }
 }

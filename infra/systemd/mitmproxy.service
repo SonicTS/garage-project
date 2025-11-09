@@ -9,13 +9,9 @@ User=mitmproxy
 Group=mitmproxy
 WorkingDirectory=/opt/blaulicht/mitmproxy
 # TIP: mitmdump is the headless binary. Adjust paths/ports as needed.
-# Prepare log directory (PermissionsStartOnly runs these as root before dropping to User)
-PermissionsStartOnly=true
-ExecStartPre=/usr/bin/mkdir -p /var/log/mitmproxy
-ExecStartPre=/usr/bin/chown mitmproxy:mitmproxy /var/log/mitmproxy
-
-# Write event logs + addon prints to logfile for later pattern analysis
-ExecStart=/usr/bin/mitmdump --mode socks5 --listen-host 0.0.0.0 --listen-port 8281 -s /opt/blaulicht/mitmproxy/garage_trigger.py --set logfile=/var/log/mitmproxy/mitmproxy.log --set console_eventlog_verbosity=info
+StateDirectory=mitmproxy
+# Explicitly set mitmproxy confdir to a systemd-managed writable location
+ExecStart=/usr/bin/mitmdump --set confdir=/var/lib/mitmproxy --mode socks5 --listen-host 0.0.0.0 --listen-port 8281 -s /opt/blaulicht/mitmproxy/garage_trigger.py
 Restart=on-failure
 RestartSec=2s
 

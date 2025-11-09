@@ -1,9 +1,9 @@
-"""mitmproxy addon: log all HTTP(S) traffic for analysis.
+"""mitmproxy addon: log HTTP(S) traffic for analysis, including CONNECT/TLS hints.
 
 Use this first to observe the real requests/responses and decide on a trigger pattern later.
 
 Run example:
-    mitmdump --mode socks5 --listen-host 0.0.0.0 --listen-port 1080 -s garage_trigger.py
+    mitmdump --mode socks5 --listen-host 0.0.0.0 --listen-port 8281 -s garage_trigger.py
 
 Notes:
 - Bodies are truncated to avoid huge logs. Adjust MAX_BODY_LOG if needed.
@@ -56,6 +56,28 @@ class GarageTrigger:
         except Exception as ex:  # Keep addon resilient
             ctx.log.warn(f"[garage_logger] Error logging request: {ex}")
 
+    def http_connect(self, flow):  # mitmproxy hook for HTTPS CONNECT tunnels
+        """Log CONNECT target host:port even if TLS is not intercepted."""
+        try:
+            host = getattr(flow.request, "host", "?")
+            port = getattr(flow.request, "port", "?")
+            ctx.log.info(f"[CONNECT] {host}:{port}")
+        except Exception as ex:
+            ctx.log.warn(f"[garage_logger] Error logging CONNECT: {ex}")
+
+    def tls_clienthello(self, data):  # mitmproxy hook for TLS handshake info
+        """Log SNI observed in ClientHello (if provided)."""
+        try:
+            # data.client_hello.sni is available in recent mitmproxy versions
+            client_hello = getattr(data, "client_hello", None)
+            sni = getattr(client_hello, "sni", None)
+            if sni:
+                ctx.log.info(f"[TLS] ClientHello SNI={sni}")
+            else:
+                ctx.log.info("[TLS] ClientHello (no SNI)")
+        except Exception as ex:
+            ctx.log.warn(f"[garage_logger] Error logging TLS ClientHello: {ex}")
+
     def response(self, flow):  # mitmproxy hook
         """Log server response details."""
         try:
@@ -78,6 +100,14 @@ class GarageTrigger:
                 ctx.log.info("[RES][B] <no text body or binary>")
         except Exception as ex:
             ctx.log.warn(f"[garage_logger] Error logging response: {ex}")
+
+    def error(self, flow):  # mitmproxy hook
+        """Log flow-level errors (network failures, timeouts, etc.)."""
+        try:
+            if flow.error:
+                ctx.log.warn(f"[FLOW-ERROR] {flow.error}")
+        except Exception as ex:
+            ctx.log.warn(f"[garage_logger] Error in error() hook: {ex}")
 
 
 # Export list for mitmproxy to recognize addons

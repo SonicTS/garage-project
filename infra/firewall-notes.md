@@ -22,8 +22,8 @@ sudo ufw allow 22/tcp
 sudo ufw allow 443/tcp
 
 # Restrict SOCKS5 port to phone IP or VPN CIDR
-sudo ufw allow proto tcp from <PHONE_IP> to any port 1080
-# Alternatively: sudo ufw allow from <VPN_SUBNET>/24 to any port 1080 proto tcp
+sudo ufw allow proto tcp from <PHONE_IP> to any port 8281
+# Alternatively: sudo ufw allow from <VPN_SUBNET>/24 to any port 8281 proto tcp
 
 sudo ufw enable
 sudo ufw status verbose
