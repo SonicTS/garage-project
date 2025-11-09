@@ -9,7 +9,9 @@ User=mitmproxy
 Group=mitmproxy
 WorkingDirectory=/opt/blaulicht/mitmproxy
 # TIP: mitmdump is the headless binary. Adjust paths/ports as needed.
-ExecStart=/usr/bin/mitmdump --mode socks5 --listen-host 0.0.0.0 --listen-port 1080 -s /opt/blaulicht/mitmproxy/garage_trigger.py
+StateDirectory=mitmproxy
+# Explicitly set mitmproxy confdir to a systemd-managed writable location
+ExecStart=/usr/bin/mitmdump --set confdir=/var/lib/mitmproxy --mode socks5 --listen-host 0.0.0.0 --listen-port 8281 -s /opt/blaulicht/mitmproxy/garage_trigger.py
 Restart=on-failure
 RestartSec=2s
 

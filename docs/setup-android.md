@@ -24,7 +24,7 @@ The Android client is a VpnService-based app that forwards only the Blaulicht ap
 4. Proxy settings (UI)
    - Expose a simple settings screen to set:
      - Host: `<DOMAIN_OR_DDNS>` of your server
-     - Port: `1080` (or the configured SOCKS5 port)
+     - Port: `8281` (or the configured SOCKS5 port)
 
 5. Trust the mitmproxy CA
    - Install the mitmproxy CA certificate on the device so TLS interception works.
