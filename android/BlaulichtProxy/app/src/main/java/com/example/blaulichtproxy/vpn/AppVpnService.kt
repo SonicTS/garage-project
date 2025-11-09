@@ -76,9 +76,9 @@ class AppVpnService : VpnService() {
         }
 
         // --- existing START logic below here (unchanged) ---
-        val host = intent?.getStringExtra(EXTRA_PROXY_HOST) ?: return START_NOT_STICKY
-        val port = intent.getIntExtra(EXTRA_PROXY_PORT, 8281)
-        val pkg  = intent.getStringExtra(EXTRA_TARGET_PKG).orEmpty()
+    val host = intent?.getStringExtra(EXTRA_PROXY_HOST) ?: return START_NOT_STICKY
+    val port = intent.getIntExtra(EXTRA_PROXY_PORT, 1080)
+    val pkg  = intent.getStringExtra(EXTRA_TARGET_PKG).orEmpty()
 
     Log.d(TAG, "onStartCommand: ACTION_START host=$host port=$port targetPkg=$pkg")
 
@@ -110,11 +110,28 @@ class AppVpnService : VpnService() {
             .setSession("Per-app VPN")
             .setMtu(1500)
             .addAddress("10.0.0.1", 32)
+            // Provide an IPv6 address to ensure IPv6 traffic is properly routed via the TUN
+            .apply { runCatching { addAddress("fd00:1:fd00::1", 128) } }
             .addDnsServer("1.1.1.1")
 
         if (pkg.isNotEmpty()) {
-            runCatching { builder.addAllowedApplication(pkg) }
-                .onFailure { Log.e(TAG, "addAllowedApplication($pkg) failed", it) }
+            try {
+                builder.addAllowedApplication(pkg)
+            } catch (e: Exception) {
+                Log.e(TAG, "Target package not found or cannot be added: $pkg", e)
+                showNotification("Package not found: $pkg")
+                sendState(STATE_ERROR, "Package not found: $pkg")
+                isRunning = false
+                stopSelf()
+                return START_NOT_STICKY
+            }
+        } else {
+            Log.e(TAG, "No target package provided; stopping")
+            showNotification("No target package")
+            sendState(STATE_ERROR, "No target package")
+            isRunning = false
+            stopSelf()
+            return START_NOT_STICKY
         }
 
         // Exclude our own app so it can reach your PC directly
@@ -137,6 +154,7 @@ class AppVpnService : VpnService() {
                 Log.e(TAG, "Preflight: cannot reach $host:$port, stopping.")
                 showNotification("Proxy $host:$port unreachable")
                 sendState(STATE_ERROR, "Proxy unreachable")
+                isRunning = false
                 stopSelf()
                 return@Thread
             }
@@ -153,6 +171,7 @@ class AppVpnService : VpnService() {
                 Log.e(TAG, "Tun2Socks: FAILED", t)
                 showNotification("Error starting VPN: ${t.message}")
                 sendState(STATE_ERROR, t.message ?: "Unknown error")
+                isRunning = false
                 stopSelf()
             }
         }.start()
@@ -163,6 +182,7 @@ class AppVpnService : VpnService() {
                 Log.e(TAG, "WATCHDOG: tun2socks did not start in 10s → stopping VPN")
                 showNotification("VPN failed to start")
                 sendState(STATE_ERROR, "Startup timeout")
+                isRunning = false
                 stopSelf()
             }
         }, 10_000)
@@ -237,6 +257,8 @@ class AppVpnService : VpnService() {
 
     private fun sendState(state: String, message: String? = null) {
         val i = Intent(ACTION_STATE).apply {
+            // Make it an explicit in-app broadcast so our NOT_EXPORTED dynamic receiver always gets it
+            setPackage(packageName)
             putExtra(EXTRA_STATE, state)
             message?.let { putExtra(EXTRA_MESSAGE, it) }
         }
