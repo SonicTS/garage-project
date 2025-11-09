@@ -1,0 +1,7 @@
+# Optional Python dependencies for the mitmproxy addon environment.
+# Install in a separate virtualenv if desired:
+#   python3 -m venv venv
+#   source venv/bin/activate
+#   pip install -r requirements.txt
+
+requests==2.31.0  # Used by garage_trigger.py to POST local trigger events

@@ -1,0 +1,24 @@
+[Unit]
+Description=Garage Controller (FastAPI)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=garage
+Group=garage
+WorkingDirectory=/opt/garage-controller
+Environment=GARAGE_CONFIG_PATH=/opt/garage-controller/config.yml
+Environment=LOG_LEVEL=info
+ExecStart=/opt/garage-controller/venv/bin/python /opt/garage-controller/app.py
+Restart=on-failure
+RestartSec=2s
+
+# Hardening ideas (uncomment and test):
+# NoNewPrivileges=true
+# PrivateTmp=true
+# ProtectSystem=full
+# ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
