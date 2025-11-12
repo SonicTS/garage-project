@@ -150,8 +150,27 @@ Export mitmproxy CA certificate (mitmproxy generates it on first run in `~/.mitm
 
 ## 10. Monitoring & Logs (Optional)
 
-- Tail logs: `journalctl -u mitmproxy -f` and `journalctl -u garage-controller -f`
-- Consider log rotation and minimal structured logging.
+- Tail logs (systemd journal):
+	- `journalctl -u mitmproxy -f`
+	- `journalctl -u garage-controller -f`
+- File logs (if using `--set logfile=/var/log/mitmproxy/mitmproxy.log`):
+	- `tail -f /var/log/mitmproxy/mitmproxy.log`
+- Add log rotation (example `/etc/logrotate.d/mitmproxy`):
+
+```bash
+sudo tee /etc/logrotate.d/mitmproxy >/dev/null <<'EOF'
+/var/log/mitmproxy/mitmproxy.log {
+		daily
+		rotate 7
+		compress
+		missingok
+		notifempty
+		create 640 mitmproxy mitmproxy
+}
+EOF
+```
+
+- Consider minimal structured logging or filtering sensitive headers before writing to disk.
 
 ## 11. TODO / Hardening Ideas
 

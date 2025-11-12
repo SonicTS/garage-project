@@ -24,7 +24,7 @@ class MainActivity : ComponentActivity() {
 
     // UI state for fields
     private var proxyHost by mutableStateOf("minecraftwgwg.hopto.org")          // later: your DDNS name
-    private var proxyPort by mutableStateOf("8281")
+    private var proxyPort by mutableStateOf("1080")
     private var targetPkg by mutableStateOf("net.ut11.ccmp.blaulicht")
     private var autostart by mutableStateOf(false)
     private var vpnState by mutableStateOf("INACTIVE")
@@ -144,7 +144,7 @@ class MainActivity : ComponentActivity() {
      */
     private fun startVpnService() {
         val host = proxyHost.trim()
-        val port = proxyPort.toIntOrNull() ?: 8281
+    val port = proxyPort.toIntOrNull() ?: 1080
         val pkg  = targetPkg.trim()
 
         // persist values for BootReceiver if user enabled autostart

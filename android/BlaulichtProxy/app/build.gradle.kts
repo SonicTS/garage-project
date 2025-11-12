@@ -19,13 +19,32 @@ android {
     }
 
 
+    signingConfigs {
+        create("release") {
+            // Read signing props from project properties (~/.gradle/gradle.properties) or JVM -D props
+            val storeFilePath = (project.findProperty("RELEASE_STORE_FILE") as String?) ?: System.getProperty("RELEASE_STORE_FILE")
+            val storePasswordProp = (project.findProperty("RELEASE_STORE_PASSWORD") as String?) ?: System.getProperty("RELEASE_STORE_PASSWORD")
+            val keyAliasProp = (project.findProperty("RELEASE_KEY_ALIAS") as String?) ?: System.getProperty("RELEASE_KEY_ALIAS")
+            val keyPasswordProp = (project.findProperty("RELEASE_KEY_PASSWORD") as String?) ?: System.getProperty("RELEASE_KEY_PASSWORD")
+
+            if (storeFilePath.isNullOrBlank() || storePasswordProp.isNullOrBlank() || keyAliasProp.isNullOrBlank() || keyPasswordProp.isNullOrBlank()) {
+                logger.warn("Release signing properties are missing. Set RELEASE_* in ~/.gradle/gradle.properties to enable signed release builds.")
+            } else {
+                storeFile = file(storeFilePath)
+                storePassword = storePasswordProp
+                keyAlias = keyAliasProp
+                keyPassword = keyPasswordProp
+            }
+        }
+    }
+
     buildTypes {
-        release {
-            isMinifyEnabled = false
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
+        getByName("release") {
+            isMinifyEnabled = false // or true + configure proguard/r8 rules
+            signingConfig = signingConfigs.getByName("release")
+        }
+        getByName("debug") {
+            // default debug signing
         }
     }
     compileOptions {
