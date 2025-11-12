@@ -24,7 +24,7 @@ class MainActivity : ComponentActivity() {
 
     // UI state for fields
     private var proxyHost by mutableStateOf("minecraftwgwg.hopto.org")          // later: your DDNS name
-    private var proxyPort by mutableStateOf("1080")
+    private var proxyPort by mutableStateOf("8281")
     private var targetPkg by mutableStateOf("net.ut11.ccmp.blaulicht")
     private var autostart by mutableStateOf(false)
     private var vpnState by mutableStateOf("INACTIVE")
@@ -57,7 +57,14 @@ class MainActivity : ComponentActivity() {
             addAction(AppVpnService.ACTION_STATE)
             addAction(AppVpnService.ACTION_METRICS)
         }
-        registerReceiver(stateReceiver, f)
+        // Android 13+ (API 33+) requires specifying whether a dynamically registered receiver
+        // is exported. Our intents are intra-app only (sent by AppVpnService), so mark NOT_EXPORTED.
+        if (Build.VERSION.SDK_INT >= 33) {
+            registerReceiver(stateReceiver, f, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("DEPRECATION")
+            registerReceiver(stateReceiver, f)
+        }
         setContent { Ui() }
     }
 

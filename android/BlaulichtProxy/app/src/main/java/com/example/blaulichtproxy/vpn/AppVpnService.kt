@@ -19,8 +19,11 @@ import com.example.blaulichtproxy.tun.Tun2SocksBridge
 import mobile.TunnelHandle
 import java.io.File
 import java.io.IOException
+import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.Socket
+import java.util.concurrent.Executors
+import java.util.concurrent.ExecutorService
 
 class AppVpnService : VpnService() {
 
@@ -66,6 +69,10 @@ class AppVpnService : VpnService() {
     private var lastSampleTs: Long = 0L
     private var currentHost: String = ""
     private var currentPort: Int = 0
+    // Single background executor so periodic proxy reachability probes don't hit main thread
+    private val ioExecutor: ExecutorService = Executors.newSingleThreadExecutor { r ->
+        Thread(r, "vpn-io").apply { isDaemon = true }
+    }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
@@ -213,6 +220,8 @@ class AppVpnService : VpnService() {
         Log.d(TAG, "onDestroy: stopping tunnel + closing fd")
         isRunning = false
         stopMetricsLoop()
+        // Ensure background tasks are cancelled
+        runCatching { ioExecutor.shutdownNow() }
         runCatching { Tun2SocksBridge.stop(tunnel) }
         tunnel = null
         runCatching { pfd?.close() }
@@ -222,14 +231,35 @@ class AppVpnService : VpnService() {
         super.onDestroy()
     }
 
-    private fun canReachProxy(host: String, port: Int, timeoutMs: Int = 3000): Boolean {
+    private fun canReachProxy(host: String, port: Int, timeoutMs: Int = 1500): Boolean {
         Log.d(TAG, "Preflight: try TCP $host:$port (timeout=${timeoutMs}ms)")
         return try {
-            Socket().use { s ->
-                s.connect(InetSocketAddress(host, port), timeoutMs)
+            val addrs = runCatching { InetAddress.getAllByName(host).toList() }.getOrElse {
+                Log.e(TAG, "DNS resolve failed for $host", it)
+                emptyList()
             }
-            Log.d(TAG, "Preflight: SUCCESS")
-            true
+            if (addrs.isEmpty()) {
+                // Fallback: attempt using unresolved to let Socket do resolution
+                Socket().use { s ->
+                    s.connect(InetSocketAddress(host, port), timeoutMs)
+                }
+                Log.d(TAG, "Preflight: SUCCESS (fallback)")
+                return true
+            }
+            val perAttempt = (timeoutMs / addrs.size.coerceAtLeast(1)).coerceAtLeast(500)
+            for (addr in addrs) {
+                try {
+                    Socket().use { s ->
+                        s.connect(InetSocketAddress(addr, port), perAttempt)
+                    }
+                    Log.d(TAG, "Preflight: SUCCESS via ${addr.hostAddress}")
+                    return true
+                } catch (e: IOException) {
+                    Log.w(TAG, "Preflight: attempt failed via ${addr.hostAddress}")
+                }
+            }
+            Log.e(TAG, "Preflight: ALL attempts failed to $host:$port")
+            false
         } catch (e: IOException) {
             Log.e(TAG, "Preflight: FAILED to $host:$port", e)
             false
@@ -310,9 +340,17 @@ class AppVpnService : VpnService() {
             lastTx = tx
             lastSampleTs = now
 
-            // probe proxy reachability occasionally to reflect health
-            val proxyOk = canReachProxy(currentHost, currentPort, timeoutMs = 800)
-            sendMetrics(rxBps, txBps, rx, tx, proxyOk)
+            // Offload network reachability probe to IO executor to satisfy StrictMode
+            ioExecutor.execute {
+                val proxyOk = runCatching { canReachProxy(currentHost, currentPort, timeoutMs = 1200) }.getOrDefault(false)
+                Log.d(TAG, "Metrics probe: host=$currentHost port=$currentPort online=$proxyOk")
+                // Post result back to main only if still running
+                mainHandler.post {
+                    if (isRunning) {
+                        sendMetrics(rxBps, txBps, rx, tx, proxyOk)
+                    }
+                }
+            }
 
             // schedule next sample
             mainHandler.postDelayed(metricsRunnable!!, 1000)
@@ -327,6 +365,8 @@ class AppVpnService : VpnService() {
 
     private fun sendMetrics(rxBps: Long, txBps: Long, rxTotal: Long, txTotal: Long, proxyOnline: Boolean) {
         val i = Intent(ACTION_METRICS).apply {
+            // Make explicit to ensure delivery to our NOT_EXPORTED receiver
+            setPackage(packageName)
             putExtra(EXTRA_RX_BPS, rxBps)
             putExtra(EXTRA_TX_BPS, txBps)
             putExtra(EXTRA_RX_TOTAL, rxTotal)
