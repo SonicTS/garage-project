@@ -1,53 +1,42 @@
-# Architecture
+# Architecture (MQTT)
 
-This document expands on how the pieces interact to get from an app’s HTTPS request to a garage door relay pulse.
+This document describes the updated MQTT-based design. mitmproxy detects the app’s flow pattern and publishes an MQTT command to a local Mosquitto broker (TLS + auth). The ESP8266 subscribes to that command topic and publishes status back.
 
 ## High-Level Diagram
 
 ```
- (Android Phone)
- +-------------------+      SOCKS5        +------------+    Local HTTP     +------------------+    Poll (HTTPS)    +-----------+
- | Blaulicht App     | ---> per-app VPN --|  mitmproxy |--> /trigger (POST)| garage-controller |<-- /poll (GET) ---| ESP8266   |--> Relay Pulse
- +-------------------+      (tun2socks)   +------------+                    +------------------+                    +-----------+
-        | HTTPS Req.              | TLS intercept (mitm CA trusted)                  ^ holds command state                |
-        v                         | inspects flows                                  |                                     v
-  Normal app logic                | addon triggers open                             | JSON {cmd: open}                    Garage Door
+(Android Phone)
++-------------------+      SOCKS5        +------------+       MQTT (TLS)       +--------------------+      Relay
+| Blaulicht App     | ---> per-app VPN --|  mitmproxy |--pub--> garage/cmd ---> |   Mosquitto Broker | --->  ESP8266
++-------------------+      (tun2socks)   +------------+<-sub-- garage/status <--+ (localhost:8883)   |   (subscribe cmd,
+   | HTTPS Req.             | TLS intercept (CA trusted)                        ^ auth+TLS          |    publish status)
+   v                        | inspects flows                                    |                   v
+ Normal app logic               | addon publishes command                           |               Garage Door
 ```
 
 ## Step-by-Step Data Flow
 
 1. The Blaulicht app sends HTTPS requests as part of its normal operation.
-2. The Android per-app VPN (VpnService + tun2socks AAR) captures ONLY that app’s traffic and forwards raw TCP streams via SOCKS5 to mitmproxy on the server.
-3. mitmproxy terminates TLS (because the phone trusts its CA certificate) and exposes HTTP request details to the addon.
-4. The custom addon examines each flow (URL, headers, payload). When a defined pattern matches (TODO: specify pattern), it POSTs JSON to `http://127.0.0.1:5001/trigger`.
-5. The `garage-controller` service records a pending command for the requested device (e.g. `{cmd: "open"}`).
-6. The ESP8266 device periodically polls `https://<DDNS_OR_DOMAIN>/garage/poll?device=<id>&token=<secret>` (proxied by nginx to the controller on `127.0.0.1:5002`).
-7. If a pending command exists, the controller returns `{ "cmd": "open" }` then clears it; otherwise `{ "cmd": "idle" }`.
-8. The ESP8266 receives `open`, toggles a relay GPIO for a short pulse, then resumes polling until the next command.
+2. The Android per-app VPN (VpnService + tun2socks) forwards ONLY that app’s TCP streams to mitmproxy (SOCKS5).
+3. mitmproxy (trusted CA on the phone) sees HTTP metadata and matches a configured trigger.
+4. The mitmproxy addon publishes `GARAGE_CMD_PAYLOAD` (default `open`) to topic `garage/cmd` over TLS to the local Mosquitto broker on 8883.
+5. The ESP8266 (RTOS SDK + mbedTLS) is connected to the same broker, subscribes to `garage/cmd`, and when it receives `open`, pulses the relay.
+6. The ESP8266 publishes `garage/status` updates (e.g., `idle`, `opening`, `opened`, `closed`) that mitmproxy or dashboards can consume.
 
-## Responsibilities Separation
+## Responsibilities
 
-- mitmproxy: Only inspects HTTP flows. Does NOT decide access control or device tokens.
-- garage-controller: Owns device registry (tokens) and pending command state. All open-door logic lives here.
-- ESP8266 firmware: Polls the public endpoint securely (TLS via nginx). Acts only when instructed. Keeps Wi-Fi credentials and its token.
+- mitmproxy: Detects pattern and publishes MQTT command. No long-term state.
+- Mosquitto: Authenticates clients, terminates TLS, routes topics.
+- ESP8266: MQTT client; subscribes to command topic and publishes status.
 
 ## Trust Boundaries
 
-- Public Internet: Only `nginx:443 -> /garage/poll` should be exposed.
-- Localhost on server: `/trigger` endpoint (mitmproxy addon to controller) is bound to `127.0.0.1`.
-- Device tokens: Stored in `config.yml` (not committed—only example provided). Tokens must be long random strings.
+- Broker listens on `localhost:8883` or LAN-restricted 8883/TCP with TLS 1.2+.
+- Strong username/password per client; broker runs as locked-down system user.
+- Self-signed private CA recommended for local deployments; embed CA in firmware.
 
-## Open Questions / TODOs
+## Open Items / TODOs
 
-- Precise trigger condition inside the mitmproxy addon (URL, JSON body fragment, header match?).
-- Rate limiting or debouncing triggers to prevent repeated openings.
-- Expiration or replay protection for commands (e.g. TTL after trigger).
-- Logging and observability: minimal structured logs? metrics?
-- Hardening: fail-closed if config missing, restrict /poll request rate.
-
-## Future Enhancements (Ideas)
-
-- Optional authentication layer or mTLS between ESP8266 and server.
-- Web UI for manual override / door status.
-- Use websockets instead of polling (would require different connectivity assumptions).
-- Integrate simple anomaly detection (e.g. too many triggers in short time).
+- Fine-tune mitmproxy trigger conditions (SNI, CONNECT host:port, URL substring).
+- Debounce commands (mitmproxy has cooldown; firmware may also enforce cooldown).
+- Optional: mTLS or per-device topics like `garage/door1/cmd`.

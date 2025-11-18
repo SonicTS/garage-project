@@ -1,34 +1,42 @@
-# ESP8266 Setup
+# ESP8266 Setup (MQTT)
 
-This is an Arduino-style sketch targeting a common ESP8266 dev board (e.g. NodeMCU). The device connects to Wi‑Fi and periodically polls the garage-controller’s `/garage/poll` endpoint. When it receives `{"cmd":"open"}`, it pulses a relay GPIO.
+The firmware (PlatformIO, ESP8266 RTOS SDK) connects to Wi‑Fi and to your Mosquitto broker over TLS, subscribes to `garage/cmd`, and publishes status on `garage/status`. The MQTT client is implemented in `esp8266/Garage-Controller/lib/mqtt` using mbedTLS.
 
-## What the firmware should do
+## Configure Wi‑Fi + MQTT
 
-- Connect to your 2.4 GHz Wi‑Fi network.
-- Every few seconds, GET `https://<DOMAIN_OR_DDNS>/garage/poll?device=<DEVICE_ID>&token=<TOKEN>`.
-- Parse JSON response:
-  - If `{ "cmd": "open" }` → pulse a GPIO (e.g., D1) for ~500 ms, then wait for the command to clear.
-  - Else `{ "cmd": "idle" }` → do nothing and continue polling.
+Edit the configuration via `config_store` defaults or your own UI. Key fields (structs in `lib/config_store/include/config_store.h`):
 
-## TODOs in the sketch
+- `wifi.ssid`, `wifi.password`
+- `mqtt.broker` (e.g. `192.168.1.10`), `mqtt.port = 8883`
+- `mqtt.client_id` (e.g. `garage-esp`)
+- `mqtt.username`, `mqtt.password` (created with `mosquitto_passwd`)
+- `mqtt.base_topic` (e.g. `garage/door1`) – used by the helper publisher
+- `mqtt.use_tls = 1`
 
-- [ ] Wi‑Fi SSID and password
-- [ ] `<DOMAIN_OR_DDNS>`
-- [ ] `DEVICE_ID` and `TOKEN`
-- [ ] Chosen GPIO pin for relay
-- [ ] TLS validation method (fingerprint/CA). Prototype may use `setInsecure()` but that’s not recommended for production.
+Embed your CA certificate (PEM) in `lib/mqtt/src/mqtt.c` by replacing the placeholder inside `mqtt_ca_pem[]` with the content of `/etc/mosquitto/certs/ca.crt`:
 
-## Flashing Steps
+```
+static const char mqtt_ca_pem[] =
+"-----BEGIN CERTIFICATE-----\n"
+"... paste ca.crt PEM here ...\n"
+"-----END CERTIFICATE-----\n";
+```
 
-1. Install Arduino IDE or use PlatformIO.
-2. Board Manager: install “ESP8266 by ESP8266 Community”. Select your board (e.g., NodeMCU 1.0).
-3. Open `esp8266/firmware.ino` from this repo.
-4. Fill in the TODOs (Wi‑Fi, device ID/token, server host, etc.).
-5. Connect the board over USB; choose the correct COM/serial port.
-6. Compile and Upload.
+Topics:
+- Commands (subscribe): `garage/cmd` (payload: `open`)
+- Status (publish): `garage/status` (payloads like `idle`, `opening`, `opened`, `closed`)
+
+The helper `mqtt_client_publish_status(subtopic, payload)` publishes to `${base_topic}/${subtopic}`; for a flat topic like `garage/status`, set `base_topic="garage"` and subtopic to `status`.
+
+## Build & Flash (PlatformIO)
+
+1) Open `esp8266/Garage-Controller` in VS Code with the PlatformIO extension.
+2) Update configuration as above and paste the CA certificate.
+3) Build (PlatformIO: Build) and Upload (PlatformIO: Upload) to your board.
+4) Monitor serial output to confirm Wi‑Fi + MQTT connection and command handling.
 
 ## Notes
 
-- GPIO driving the relay should match your relay board’s logic (HIGH to activate vs. LOW to activate). Adjust accordingly.
-- Add a small debounce or cooldown to avoid rapid repeated openings.
-- Consider persisting minimal state or adding a watchdog for reliability.
+- Ensure RTC/peripherals meet your relay board’s logic level and activation polarity.
+- Implement relay cooldown in your app logic to avoid rapid toggles.
+- For mTLS, you could extend `mqtt.c` to load a client cert/key if desired.

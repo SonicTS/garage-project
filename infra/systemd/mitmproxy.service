@@ -10,8 +10,9 @@ Group=mitmproxy
 WorkingDirectory=/opt/blaulicht/mitmproxy
 # TIP: mitmdump is the headless binary. Adjust paths/ports as needed.
 StateDirectory=mitmproxy
+EnvironmentFile=-/etc/blaulicht/mqtt.env
 # Explicitly set mitmproxy confdir to a systemd-managed writable location
-ExecStart=/usr/bin/mitmdump --set confdir=/var/lib/mitmproxy --mode socks5 --listen-host 0.0.0.0 --listen-port 8281 -s /opt/blaulicht/mitmproxy/garage_trigger.py --set block_global=false
+ExecStart=/opt/blaulicht/mitmproxy/venv/bin/mitmdump --set confdir=/var/lib/mitmproxy --mode socks5 --listen-host 0.0.0.0 --listen-port 8281 -s /opt/blaulicht/mitmproxy/garage_trigger.py --set block_global=false
 Restart=on-failure
 RestartSec=2s
 

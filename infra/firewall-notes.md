@@ -1,11 +1,11 @@
-# Firewall Notes
+# Firewall Notes (MQTT)
 
-These notes provide example approaches using `ufw` (Uncomplicated Firewall) on Ubuntu. Adjust rules to your own risk appetite and network layout.
+Example `ufw` rules for the MQTT-based setup. Adjust to your risk appetite and network layout.
 
 ## Goals
 
-- Expose only HTTPS for `/garage/poll`.
-- Limit SOCKS5 port (mitmproxy) to specific source IP(s) (e.g., your phone or VPN range).
+- Allow MQTT over TLS on 8883 (LAN-only if possible).
+- Limit SOCKS5 port (mitmproxy) to the phone/VPN source IP(s).
 - Allow SSH for maintenance (optionally restricted to home IPs).
 
 ## Example UFW Setup
@@ -18,8 +18,8 @@ sudo ufw default allow outgoing
 sudo ufw allow 22/tcp
 # e.g.: sudo ufw allow from <HOME_IP> to any port 22 proto tcp
 
-# Allow HTTPS for ESP8266 polling
-sudo ufw allow 443/tcp
+# Allow MQTT over TLS (broker)
+sudo ufw allow 8883/tcp
 
 # Restrict SOCKS5 port to phone IP or VPN CIDR
 sudo ufw allow proto tcp from <PHONE_IP> to any port 8281
@@ -31,10 +31,9 @@ sudo ufw status verbose
 
 ## Additional Considerations
 
-- Consider fail2ban or rate limiting at nginx for repeated `/garage/poll` hits.
 - Keep system packages updated; a firewall doesn’t patch vulnerabilities.
-- Avoid exposing `:5001` (trigger endpoint) beyond localhost.
-- Consider closing port 80 unless needed for ACME/Certbot HTTP challenges (then re-lock after certificate issuance).
+- Avoid exposing 8883 to the Internet; prefer LAN-only or source-restricted rules.
+- If you previously used nginx/HTTPS for polling, remove those rules.
 
 ## Non-UFW Alternatives
 

@@ -1,13 +1,13 @@
-# Threat Model
+# Threat Model (MQTT)
 
 Plain-language overview of what we’re defending against and what is out of scope for this hobby setup.
 
 ## Goals / What We Try To Protect Against
 
 - Random Internet scanners or bots hitting open ports.
-- Opportunistic attackers discovering the `/garage/poll` endpoint.
-- Accidental or unauthorized triggering of the garage door via forged poll responses.
-- Simple replay scenarios (e.g. repeatedly receiving an `open` command if not cleared).
+- Opportunistic attackers targeting open MQTT (8883) or SOCKS5 ports.
+- Accidental or unauthorized triggering of the garage door via MQTT command injection.
+- Simple replay scenarios via repeated publishes if cooldowns are bypassed.
 
 ## Non-Goals / Out of Scope
 
@@ -19,38 +19,35 @@ Plain-language overview of what we’re defending against and what is out of sco
 ## Assets
 
 - Ability to open the garage door.
-- Device tokens stored in `config.yml`.
-- Integrity of command flow between mitmproxy addon and garage-controller.
+- MQTT credentials stored in `/etc/mosquitto/passwd`.
+- Integrity of command flow between mitmproxy addon and mosquitto broker.
 
 ## Attack Surfaces
 
-- Public HTTPS endpoint `/garage/poll`.
-- SOCKS5 port exposed for the phone (restricted firewall rules recommended).
-- Local internal `/trigger` endpoint (should be bound to 127.0.0.1 only).
+- MQTT over TLS on 8883 (should be LAN-only or source-restricted).
+- SOCKS5 port for the phone (restricted firewall rules recommended).
 
 ## Mitigations
 
-- Only `/garage/poll` is exposed publicly; `/trigger` remains localhost.
-- Long random per-device tokens (not human guessable).
-- Separate Unix users `mitmproxy` and `garage` to reduce lateral impact.
-- Firewall: restrict SOCKS5 port, allow only needed HTTPS and SSH.
-- TLS via nginx for ESP8266 polling (protects token in transit).
-- Simple state clearing after command use (prevents indefinite repeated opens).
+- MQTT broker is LAN-only or source-restricted; TLS 1.2+ with strong per-client passwords.
+- Separate Unix users `mitmproxy` and `mosq` to reduce lateral impact.
+- Firewall: restrict SOCKS5 and 8883; allow SSH.
+- TLS on MQTT; self-signed CA with ESP8266 embedding; server key permissions locked down.
+- mitmproxy cooldown on publishes to reduce accidental repeats.
 
 ## Residual Risks / Trade-offs
 
-- Tokens stored in plain text config on disk (acceptable for hobby use; could be encrypted or in a vault for production).
-- ESP8266 may use less robust TLS validation (certificate pinning recommended for stronger security).
-- Rate limiting not implemented yet—potential brute-force attempts on `/garage/poll` could occur.
+- Passwords in mosquitto passwd; protect file mode; consider per-device accounts.
+- ESP8266 TLS validation relies on embedded CA; keep CA private key offline.
+- No rate limiting on MQTT by default—consider connection limits and auth lockouts.
 
 ## Future Hardening Ideas
 
-- Add nginx rate limiting / fail2ban.
-- Use mutual TLS or signed requests from device.
-- Implement limited command history with timestamps and TTL.
-- Add systemd sandboxing directives (ProtectHome, PrivateTmp, etc.).
-- Monitor logs for unusual poll frequency or failed token attempts.
+- Consider mTLS or per-device topics.
+- Implement limited command history or deduplication on firmware side.
+- Add systemd sandboxing directives for mitmproxy and mosquitto.
+- Monitor logs for unusual connection attempts or repeated publishes.
 
 ## Summary
 
-Security posture: “Reasonable for a hobby project.” It reduces exposure, uses long tokens, and isolates components. It is not designed for high-assurance environments or motivated attackers—treat it as a learning platform.
+Security posture: “Reasonable for a hobby project.” It reduces exposure, uses TLS and per-client credentials, and isolates components. It is not designed for high-assurance environments—treat it as a learning platform.
