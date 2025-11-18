@@ -1,27 +1,36 @@
-# ESP8266 Firmware
+# Garage Controller (ESP8266 RTOS)
 
-Target board: NodeMCU / generic ESP8266 development board.
+Wi-Fi–enabled garage controller running on an ESP8266 (ESP-12F) using the
+ESP8266 RTOS SDK and PlatformIO.
 
-## Purpose
+Main features (planned / in progress):
 
-Poll the garage-controller `/garage/poll` endpoint and pulse a relay when instructed to open.
+- STA + AP fallback Wi-Fi manager
+- HTTP service interface for configuration
+- Persistent configuration storage (Wi-Fi, MQTT, logic)
+- Garage control logic (relays, sensors, alarms)
+- MQTT integration for remote control / monitoring
 
-## Flashing (Arduino IDE)
+## Project layout
 
-1. Install "ESP8266 by ESP8266 Community" via Board Manager.
-2. Select your board (e.g., NodeMCU 1.0) and correct COM port.
-3. Open `firmware.ino`.
-4. Fill in Wi‑Fi credentials, server host, device ID, and token.
-5. Upload.
+- `src/`
+  - `main.c` – SDK entrypoint (`user_init` + RF cal) that just calls `app_start()`.
+- `lib/`
+  - `app/` – top-level orchestration: starts Wi-Fi, HTTP, garage logic, etc.
+  - `wifi_manager/` – STA/AP state machine, retries, IP tracking.
+  - `service_interface/` – HTTP/REST-style configuration API.
+  - `config_store/` – configuration structs + persistence (flash).
+  - `garage_control/` – garage-door specific logic (GPIO, sensors, alarms).
+  - `mqtt/` – MQTT client wrapper and integration.
 
-## Relay Wiring (Text Only)
+## Build / flash
 
-- Use a transistor/relay module appropriate for your door opener’s control circuit.
-- GPIO (e.g., D1) → Relay IN; 3V3 / GND to module power.
-- The relay NO (Normally Open) contacts go across the garage opener’s push-button terminals. The pulse simulates a button press.
+```bash
+# Build
+pio run
 
-## Notes / TODOs
+# Upload firmware
+pio run -t upload
 
-- Implement proper TLS certificate validation (fingerprint or CA bundle).
-- Add cooldown to avoid rapid repeated openings.
-- Consider watchdog reset for reliability.
+# Serial monitor
+pio device monitor

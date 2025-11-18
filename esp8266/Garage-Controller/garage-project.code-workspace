@@ -1,0 +1,19 @@
+{
+	"folders": [
+		{
+			"path": "../.."
+		},
+		{
+			"name": "Garage-Controller",
+			"path": "."
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"string.h": "c",
+			"app_events.h": "c",
+			"service_interface.h": "c",
+			"config_store.h": "c"
+		}
+	}
+}
