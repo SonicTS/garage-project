@@ -1,0 +1,8 @@
+# Example ACL granting espclient full access (adjust for least privilege)
+user espclient
+topic readwrite #
+
+# For tighter scopes, prefer:
+# user espclient
+# topic write garage/cmd
+# topic read  garage/status

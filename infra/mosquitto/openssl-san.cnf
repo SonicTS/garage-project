@@ -1,0 +1,35 @@
+[ req ]
+default_bits       = 2048
+prompt             = no
+default_md         = sha256
+distinguished_name = req_distinguished_name
+req_extensions     = req_ext
+
+[ req_distinguished_name ]
+C  = DE
+ST = Germany
+L  = Home
+O  = MyMQTT
+OU = Broker
+CN = minecraftwgwg.hopto.org
+
+[ req_ext ]
+subjectAltName = @alt_names
+
+[ alt_names ]
+# Localhost
+DNS.1 = localhost
+IP.1  = 127.0.0.1
+
+# LAN IP of MQTT broker
+IP.2  = 192.168.1.100
+
+# Network address (harmless but accepted by mbedTLS)
+IP.3  = 192.168.1.0
+
+# Ubuntu hostnames
+DNS.2 = minecraft
+DNS.3 = minecraft.local
+
+# Your DDNS
+DNS.4 = minecraftwgwg.hopto.org
