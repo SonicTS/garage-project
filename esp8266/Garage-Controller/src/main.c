@@ -2,6 +2,7 @@
 #include "esp_common.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "log.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -30,8 +31,17 @@ uint32 ICACHE_FLASH_ATTR user_rf_cal_sector_set(void)
 /******** Entrypoint ********/
 void user_init(void)
 {
-    uart_div_modify(0, UART_CLK_FREQ / 74880);
-    printf("Booting...\n");
+    
+    uart_div_modify(0, UART_CLK_FREQ / 115200);
+    LOGF("Booting...\n");
+    flash_size_map sm = system_get_flash_size_map();
+    uint32 rfsec = user_rf_cal_sector_set();
+    LOGF("Flash map=%d, rf_cal_sector=%u\n", (int)sm, (unsigned)rfsec);
+    struct rst_info *ri = system_get_rst_info();
+    if (ri) {
+        LOGF("Reset reason: %d, exccause=%d, epc1=0x%08x\n",
+                ri->reason, ri->exccause, ri->epc1);
+    }
     
     app_start();
 }
