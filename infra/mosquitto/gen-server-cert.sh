@@ -1,3 +1,4 @@
+#gen-server-cert.sh
 #!/usr/bin/env bash
 set -euo pipefail
 
