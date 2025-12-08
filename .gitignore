@@ -207,3 +207,9 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Allow tracking specific embedded C libraries
+!esp8266/Garage-Controller/lib/
+!esp8266/Garage-Controller/lib/**
+!Garage-Controller/lib/
+!Garage-Controller/lib/**
