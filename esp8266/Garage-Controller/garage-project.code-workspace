@@ -6,6 +6,9 @@
 		{
 			"name": "Garage-Controller",
 			"path": "."
+		},
+		{
+			"path": "../../../../../.platformio/packages/framework-esp8266-rtos-sdk/include"
 		}
 	],
 	"settings": {
