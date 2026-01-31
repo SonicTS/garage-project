@@ -9,6 +9,16 @@
 
 
 /******** RF CAL (required) ********/
+void ICACHE_FLASH_ATTR user_rf_pre_init(void)
+{
+    /* Critical: Force full RF calibration on every boot for stability.
+       This is especially important for cheap ESP8266 modules with poor RF. */
+    /* Use supported API to request RF calibration behavior after power-up */
+    system_phy_set_rfoption(1);
+    /* Additional: Set max RF TX power (82 = 20.5dBm) for better range */
+    system_phy_set_max_tpw(82);
+}
+
 uint32 ICACHE_FLASH_ATTR user_rf_cal_sector_set(void)
 {
     flash_size_map size_map = system_get_flash_size_map();

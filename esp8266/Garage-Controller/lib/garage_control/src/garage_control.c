@@ -142,9 +142,9 @@ void gpio_init(void)
     int err = gpio_simple_make_input(PIN_REED_SWT_BOTTOM, 1);
     err += gpio_simple_make_input(PIN_REED_SWT_MIDDLE, 1);
     err += gpio_simple_make_input(PIN_REED_SWT_TOP, 1);
-    err += gpio_simple_make_input(PIN_STOP_BTN, 1);
-    err += gpio_simple_make_input(PIN_UP_BTN, 1);
-    err += gpio_simple_make_input(PIN_DOWN_BTN, 1);
+    err += gpio_simple_make_input(PIN_STOP_BTN, 0);
+    err += gpio_simple_make_input(PIN_UP_BTN, 0);
+    err += gpio_simple_make_input(PIN_DOWN_BTN, 0);
     LOGF("GPIO init result: %d\n", err);
 }
 

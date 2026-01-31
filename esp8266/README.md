@@ -34,3 +34,4 @@ pio run -t upload
 
 # Serial monitor
 pio device monitor
+```
