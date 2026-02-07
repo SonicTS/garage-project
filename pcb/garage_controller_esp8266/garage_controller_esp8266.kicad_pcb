@@ -625,6 +625,39 @@
 			(uuid "a249ba5d-b2f3-4cf8-b152-0c1434846419")
 		)
 		(embedded_fonts no)
+		(model "${KICAD9_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x08_P2.54mm_Vertical.step"
+			(offset
+				(xyz -11.65 8.9 0)
+			)
+			(scale
+				(xyz 1 1 1)
+			)
+			(rotate
+				(xyz -0 -0 -0)
+			)
+		)
+		(model "${KICAD9_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x08_P2.54mm_Vertical.step"
+			(offset
+				(xyz 11.65 8.9 0)
+			)
+			(scale
+				(xyz 1 1 1)
+			)
+			(rotate
+				(xyz -0 -0 -0)
+			)
+		)
+		(model "C:/Users/schoe/Documents/GitHub/garage-project/pcb/wemos-mini-d1.stp"
+			(offset
+				(xyz -0.25 0.75 11.5)
+			)
+			(scale
+				(xyz 1 1 1)
+			)
+			(rotate
+				(xyz -0 -0 -90)
+			)
+		)
 	)
 	(footprint "LED_SMD:LED_0805_2012Metric_Pad1.15x1.40mm_HandSolder"
 		(layer "F.Cu")
@@ -4362,15 +4395,15 @@
 			(uuid "d4879f01-1188-44f4-b7fa-7b9dab736a81")
 		)
 		(embedded_fonts no)
-		(model "${KICAD9_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x03_P2.54mm_Vertical.step"
+		(model "C:/Users/schoe/Documents/GitHub/garage-project/pcb/KF128-2.54-3P.step"
 			(offset
-				(xyz 0 0 0)
+				(xyz 0 -2.5 0)
 			)
 			(scale
 				(xyz 1 1 1)
 			)
 			(rotate
-				(xyz 0 0 0)
+				(xyz -0 -0 -90)
 			)
 		)
 	)
@@ -6936,15 +6969,15 @@
 			(uuid "a48ebd98-4ee0-422f-a8c9-5b6440c97f67")
 		)
 		(embedded_fonts no)
-		(model "${KICAD9_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x09_P2.54mm_Vertical.step"
+		(model "C:/Users/schoe/Documents/GitHub/garage-project/pcb/KF128-2.54-9P.step"
 			(offset
-				(xyz 0 0 0)
+				(xyz 0 -10.25 0)
 			)
 			(scale
 				(xyz 1 1 1)
 			)
 			(rotate
-				(xyz 0 0 0)
+				(xyz -0 -0 90)
 			)
 		)
 	)

@@ -1916,6 +1916,15 @@
 					(hide yes)
 				)
 			)
+			(property "Supplier" ""
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
 			(symbol "Wemos D1 mini connector_0_1"
 				(rectangle
 					(start -15.24 16.51)
