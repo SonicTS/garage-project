@@ -6,6 +6,7 @@
 #include "mqtt.h"
 #include "config_store.h"
 #include "garage_control.h"
+#include "debug_led.h"
 
 #include <string.h>
 
@@ -59,6 +60,8 @@ void app_start(void)
     LOGF("app: service interface initialized\n");
     mqtt_client_init(&cfg.mqtt, mqtt_command_handler);
     LOGF("app: mqtt client initialized\n");
+    garage_control_blink_debug_led(GARAGE_LED_SLOW, 5);
     garage_control_init();
+    garage_control_blink_debug_led(GARAGE_LED_SLOW, 5);
     LOGF("app: garage control initialized\n");
 }

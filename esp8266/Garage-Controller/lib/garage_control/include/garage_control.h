@@ -1,9 +1,11 @@
 #pragma once
 
 #include <stdint.h>
+#include "debug_led.h"
 #include "app_events.h"
 #include "gpio_simple.h"
 #include "config_store.h"
+#include "mcp23017.h"
 #include "log.h"
 
 
@@ -54,13 +56,6 @@ void garage_control_set_close_after_seconds(uint32_t seconds);
 /* Internal sensor handling is private now; no public raw read hooks. */
 void garage_hw_pulse_relay_open(void);  /* trigger motor/relay to open */
 void garage_hw_pulse_relay_close(void); /* trigger motor/relay to close */
-
-/* Blink the onboard debug LED (Wemos D1 mini = GPIO2). Non-blocking.
- * mode: 0 = short (100 ms period), 1 = fast (500 ms period)
- * repeats: number of blinks, clipped to [1..20]
- */
-typedef enum { GARAGE_LED_FAST = 0, GARAGE_LED_SLOW = 1 } garage_led_mode_t;
-void garage_control_blink_debug_led(garage_led_mode_t mode, uint8_t repeats);
 
 /* Return current logical door state */
 garage_state_t garage_control_get_logical_state(void);
