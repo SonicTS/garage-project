@@ -13,8 +13,8 @@
 #define I2C_SCL_GPIO 5
 
 #define MCP23017_ALL_PINS_OUT 0x0000
-#define MCP23017_ALL_PINS_ON 0xFFFF
-#define MCP23017_ALL_PINS_OFF 0x0000
+#define MCP23017_ALL_PINS_ON  0x0000
+#define MCP23017_ALL_PINS_OFF 0xFFFF
 
 #define WRITE_BIT                           0 /*!< I2C master write */
 #define READ_BIT                            1  /*!< I2C master read */
