@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <stdbool.h>
 #include "log.h"
 
 /* ---- WiFi sub-config ---- */
@@ -31,6 +32,7 @@ typedef struct {
            0 = disabled. Persisted in flash. */
         uint32_t close_after_seconds;
     } garage;
+    bool gpio_inverted; /* If true, active HIGH means "closed" and LOW means "open". Default false. */
     /* later:
        - garage settings
        - alarm thresholds
@@ -54,3 +56,7 @@ void config_store_set_wifi(const wifi_config_t *wifi_in);
 /* Get/Set just the garage portion */
 void config_store_get_garage(uint32_t *close_after_seconds_out);
 void config_store_set_garage_close_after(uint32_t close_after_seconds);
+
+/* Get/Set GPIO inversion */
+void config_store_get_gpio_inverted(bool *gpio_inverted_out);
+void config_store_set_gpio_inverted(bool gpio_inverted);

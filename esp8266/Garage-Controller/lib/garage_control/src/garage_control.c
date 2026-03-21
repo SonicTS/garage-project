@@ -50,9 +50,11 @@ static void close_timer_cb(xTimerHandle t);
 
 void toggle_pin(int pin)
 {
+    bool gpio_inverted = false;
+    config_store_get_gpio_inverted(&gpio_inverted);
     for (size_t i = 0; i < TOGGLE_COUNTS * 2; i++)
     {
-        set_output_bit_for_pin(pin, i % 2 == 0);
+        set_output_bit_for_pin(pin, gpio_inverted ? !(i % 2 == 0) : (i % 2 == 0));
         flush_output();
         vTaskDelay(250 / portTICK_RATE_MS);
     }
@@ -141,7 +143,15 @@ void garage_control_init(void)
 	// set_bit(&direction, PIN_REED_SWT_MIDDLE, true); 
 	// set_bit(&direction, PIN_REED_SWT_TOP, true);
 	set_io_direction(direction);
-    set_all_output_bits(MCP23017_ALL_PINS_OFF);
+    bool gpio_inverted = false;
+    config_store_get_gpio_inverted(&gpio_inverted);
+    if (gpio_inverted) {
+        LOGF("garage_control: GPIO inversion enabled\n");
+        set_all_output_bits(MCP23017_ALL_PINS_OFF); /* default HIGH = inactive */
+    } else {
+        LOGF("garage_control: GPIO inversion disabled\n");      
+        set_all_output_bits(MCP23017_ALL_PINS_ON); /* default LOW = inactive */
+    }    
     flush_output();
     g_close_timer = xTimerCreate("gc_close", (1000 / portTICK_RATE_MS), pdFALSE, NULL, close_timer_cb);
     g_cmd_queue = xQueueCreate(6, sizeof(gc_cmd_msg_t));
@@ -173,7 +183,7 @@ void garage_control_command_close(void)
 
 static void start_open_sequence(void)
 {
-    if (g_control_state == GARAGE_CONTROL_OPENING || g_control_state == GARAGE_CONTROL_CLOSING) return;
+    if (g_control_state == GARAGE_CONTROL_OPENING) return;
     g_control_state = GARAGE_CONTROL_OPENING;
     g_logical_state = GARAGE_STATE_MOVING_UP;
     g_move_start_ms = xTaskGetTickCount() * portTICK_RATE_MS;
@@ -183,7 +193,7 @@ static void start_open_sequence(void)
 
 static void start_close_sequence(void)
 {
-    if (g_control_state == GARAGE_CONTROL_CLOSING || g_control_state == GARAGE_CONTROL_OPENING) return;
+    if (g_control_state == GARAGE_CONTROL_CLOSING) return;
     g_control_state = GARAGE_CONTROL_CLOSING;
     g_logical_state = GARAGE_STATE_MOVING_DOWN;
     g_move_start_ms = xTaskGetTickCount() * portTICK_RATE_MS;

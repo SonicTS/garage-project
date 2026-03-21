@@ -223,3 +223,16 @@ void config_store_set_garage_close_after(uint32_t close_after_seconds)
     g_cfg.garage.close_after_seconds = close_after_seconds;
     save_to_flash(&g_cfg);
 }
+
+void config_store_get_gpio_inverted(bool *gpio_inverted_out)
+{
+    if (!gpio_inverted_out) return;
+    *gpio_inverted_out = g_cfg.gpio_inverted;
+}
+
+
+void config_store_set_gpio_inverted(bool gpio_inverted)
+{
+    g_cfg.gpio_inverted = gpio_inverted;
+    save_to_flash(&g_cfg);
+}

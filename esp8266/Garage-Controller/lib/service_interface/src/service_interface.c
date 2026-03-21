@@ -149,6 +149,12 @@ static void send_html_form(int csock, const char *status)
              mc.use_tls ? "checked" : "");
     if (send_all(csock, line, strlen(line)) != 0) return;
 
+    /* GPIO Inverted checkbox */
+    snprintf(line, sizeof(line),
+             "<label>GPIO Inverted:<input type=\"checkbox\" name=\"gpio_inverted\" value=\"1\" %s></label>",
+             cfg.gpio_inverted ? "checked" : "");
+    if (send_all(csock, line, strlen(line)) != 0) return;
+
     if (send_all(csock, "<button type=\"submit\">Save</button></form>", 44) != 0) return;
 
     /* Footer with heap info */
@@ -220,7 +226,7 @@ static void handle_client(int csock)
 
     if (query) {
         char wifi_ssid[32], wifi_pass[64];
-        char br[64], cid[32], user[32], pass[32], base[64], tls[8], port[8];
+        char br[64], cid[32], user[32], pass[32], base[64], port[8];
 
         get_param_value(query, "wifi_ssid",   wifi_ssid, sizeof(wifi_ssid));
         get_param_value(query, "wifi_pass",   wifi_pass, sizeof(wifi_pass));
@@ -230,7 +236,6 @@ static void handle_client(int csock)
         get_param_value(query, "mqtt_user",   user,      sizeof(user));
         get_param_value(query, "mqtt_pass",   pass,      sizeof(pass));
         get_param_value(query, "mqtt_base",   base,      sizeof(base));
-        get_param_value(query, "mqtt_tls",    tls,       sizeof(tls));
 
         int wifi_changed = 0;
         int mqtt_changed = 0;
@@ -257,10 +262,22 @@ static void handle_client(int csock)
         if (pass[0]){ strncpy(mc.password,   pass, sizeof(mc.password) - 1);   mqtt_changed = 1; }
         if (base[0]){ strncpy(mc.base_topic, base, sizeof(mc.base_topic) - 1); mqtt_changed = 1; }
 
-        /* Only change TLS flag if parameter present at all */
-        if (strstr(query, "mqtt_tls=") != NULL) {
-            mc.use_tls = (tls[0] == '1') ? 1 : 0;
-            mqtt_changed = 1;
+        /* Checkbox semantics: present means enabled, absent means disabled. */
+        {
+            uint8_t new_tls = (strstr(query, "mqtt_tls=1") != NULL) ? 1 : 0;
+            if (mc.use_tls != new_tls) {
+                mc.use_tls = new_tls;
+                mqtt_changed = 1;
+            }
+        }
+
+        {
+            bool new_gpio_inverted = (strstr(query, "gpio_inverted=1") != NULL) ? true : false;
+            if (cfg.gpio_inverted != new_gpio_inverted) {
+                cfg.gpio_inverted = new_gpio_inverted;
+                LOGF("service_interface: GPIO inversion set to %d\n", cfg.gpio_inverted);
+                config_store_set_gpio_inverted(cfg.gpio_inverted);
+            }
         }
 
         LOGF("service_interface: wifi_changed=%d mqtt_changed=%d\n",
