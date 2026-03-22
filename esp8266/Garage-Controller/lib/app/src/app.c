@@ -6,6 +6,8 @@
 #include "mqtt.h"
 #include "config_store.h"
 #include "garage_control.h"
+#include "debug_led.h"
+#include "uart.h"
 
 #include <string.h>
 
@@ -42,9 +44,29 @@ static void mqtt_command_handler(const char *topic,
     } 
 }
 
+void init_uart_for_debug(void)
+{
+    UART_WaitTxFifoEmpty(UART0);
+    UART_WaitTxFifoEmpty(UART1);
+
+    UART_ConfigTypeDef uart_config;
+    uart_config.baud_rate    = BIT_RATE_9600;
+    uart_config.data_bits     = UART_WordLength_8b;
+    uart_config.parity          = USART_Parity_None;
+    uart_config.stop_bits     = USART_StopBits_1;
+    uart_config.flow_ctrl      = USART_HardwareFlowControl_None;
+    uart_config.UART_RxFlowThresh = 120;
+    uart_config.UART_InverseMask = UART_None_Inverse;
+    UART_ParamConfig(UART0, &uart_config);
+    UART_SetPrintPort(UART0);
+}
+
 void app_start(void)
 {
     /* Create global event queue used by all modules */
+    init_uart_for_debug();
+    vTaskDelay(100 / portTICK_RATE_MS);
+    LOGF("\napp: UART initialized for debug\n");  
     LOGF("app: Starting app...\n");
     g_app_event_queue = xQueueCreate(10, sizeof(app_evt_t));
     LOGF("app: event queue created\n");
@@ -59,6 +81,8 @@ void app_start(void)
     LOGF("app: service interface initialized\n");
     mqtt_client_init(&cfg.mqtt, mqtt_command_handler);
     LOGF("app: mqtt client initialized\n");
+    garage_control_blink_debug_led(GARAGE_LED_SLOW, 5);
     garage_control_init();
+    garage_control_blink_debug_led(GARAGE_LED_SLOW, 5);
     LOGF("app: garage control initialized\n");
 }
