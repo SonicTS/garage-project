@@ -162,6 +162,8 @@ static void start_sta_with_bss(const struct bss_info *best)
 
     strncpy((char*)st.password, g_cfg.password, sizeof(st.password) - 1);
     st.password[sizeof(st.password) - 1] = 0;
+    LOGF("wifi_manager: prepared station config for SSID \"%s\"\n", st.ssid);
+    LOGF("wifi_manager: prepared station config with password \"%s\"\n", st.password[0] ? (char*)st.password : "(empty)");
 
     if (best) {
         memcpy(st.bssid, best->bssid, sizeof(st.bssid));

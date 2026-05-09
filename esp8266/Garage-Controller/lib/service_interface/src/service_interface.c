@@ -23,7 +23,79 @@ static char http_req_buf[512]; /* trimmed request buffer */
 
 /* Socket-based HTTP server (replace espconn to avoid heap corruption). */
 
-static void get_param_value(const char *query,const char *key,char *out,int out_len){ out[0]='\0'; if(!query||!key||!out||out_len<=0) return; const char *p=strstr(query,key); if(!p) return; p+=strlen(key); if(*p=='=') p++; int i=0; while(*p&&*p!='&'&&*p!=' '&&i<out_len-1){ out[i++]=*p++; } out[i]='\0'; }
+static int hexval(char c)
+{
+    if (c >= '0' && c <= '9') return c - '0';
+    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+    return -1;
+}
+
+static void url_decode(const char *src, char *dst, int dst_len)
+{
+    int i = 0;
+    if (!src || !dst || dst_len <= 0) return;
+
+    while (*src && i < dst_len - 1) {
+        if (*src == '%') {
+            int hi = hexval((unsigned char)src[1]);
+            int lo = hexval((unsigned char)src[2]);
+            if (hi >= 0 && lo >= 0) {
+                dst[i++] = (char)((hi << 4) | lo);
+                src += 3;
+                continue;
+            }
+            /* invalid % sequence: copy '%' literally */
+            dst[i++] = *src++;
+        } else if (*src == '+') {
+            /* x-www-form-urlencoded semantics */
+            dst[i++] = ' ';
+            src++;
+        } else {
+            dst[i++] = *src++;
+        }
+    }
+
+    dst[i] = '\0';
+}
+
+static int param_name_match(const char *p, const char *key)
+{
+    int klen = strlen(key);
+    if (strncmp(p, key, klen) != 0) return 0;
+    return p[klen] == '=';
+}
+
+static void get_param_value(const char *query, const char *key, char *out, int out_len)
+{
+    const char *p;
+
+    if (!out || out_len <= 0) return;
+    out[0] = '\0';
+
+    if (!query || !key) return;
+
+    p = query;
+    while (*p) {
+        if ((p == query || p[-1] == '&') && param_name_match(p, key)) {
+            const char *v = p + strlen(key) + 1; /* skip key= */
+            char raw[128];
+            int i = 0;
+
+            while (*v && *v != '&' && *v != ' ' && i < (int)sizeof(raw) - 1) {
+                raw[i++] = *v++;
+            }
+            raw[i] = '\0';
+
+            url_decode(raw, out, out_len);
+            return;
+        }
+
+        p = strchr(p, '&');
+        if (!p) break;
+        p++; /* next param */
+    }
+}
 
 static int send_all(int sock, const char *buf, int len){
     int total = 0; while (total < len){ int sent = send(sock, buf+total, len-total, 0); if (sent <= 0) return -1; total += sent; } return 0; }
@@ -248,9 +320,10 @@ static void handle_client(int csock)
                 wifi_changed = 1;
                 strncpy(cfg.wifi.ssid, wifi_ssid, sizeof(cfg.wifi.ssid) - 1);
                 cfg.wifi.ssid[sizeof(cfg.wifi.ssid) - 1] = '\0';
-
+                LOGF("service_interface: new WiFi SSID \"%s\"\n", cfg.wifi.ssid);
                 strncpy(cfg.wifi.password, wifi_pass, sizeof(cfg.wifi.password) - 1);
                 cfg.wifi.password[sizeof(cfg.wifi.password) - 1] = '\0';
+                LOGF("service_interface: new WiFi password \"%s\"\n", cfg.wifi.password);
             }
         }
 
