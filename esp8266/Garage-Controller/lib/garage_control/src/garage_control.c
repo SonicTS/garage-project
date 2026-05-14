@@ -35,8 +35,8 @@ const int PIN_REED_SWT_BOTTOM = 13;  // D5
 const int PIN_REED_SWT_MIDDLE = 12; // D7
 const int PIN_REED_SWT_TOP = 11; // RX
 const int PIN_UP_BTN = 8;
-const int PIN_STOP_BTN = 10;
-const int PIN_DOWN_BTN = 12;
+const int PIN_STOP_BTN = 9;
+const int PIN_DOWN_BTN = 10;
 const int TOGGLE_COUNTS = 4;
 
 /* Forward declarations */
