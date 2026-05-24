@@ -42,7 +42,7 @@ uint32 ICACHE_FLASH_ATTR user_rf_cal_sector_set(void)
 void user_init(void)
 {
     
-    uart_div_modify(0, UART_CLK_FREQ / 115200);
+    uart_div_modify(0, UART_CLK_FREQ / 9600);
     LOGF("Booting...\n");
     flash_size_map sm = system_get_flash_size_map();
     uint32 rfsec = user_rf_cal_sector_set();
