@@ -23,7 +23,7 @@ static xTaskHandle g_gc_task = NULL;
 static xQueueHandle g_cmd_queue = NULL;
 
 /* Command queue message */
-typedef enum { GC_CMD_OPEN, GC_CMD_CLOSE } gc_cmd_t;
+typedef enum { GC_CMD_OPEN, GC_CMD_CLOSE, GC_CMD_STOP } gc_cmd_t;
 
 
 
@@ -56,21 +56,25 @@ void toggle_pin(int pin)
     {
         set_output_bit_for_pin(pin, gpio_inverted ? !(i % 2 == 0) : (i % 2 == 0));
         flush_output();
-        vTaskDelay(250 / portTICK_RATE_MS);
+        vTaskDelay(500 / portTICK_RATE_MS);
     }
 }
 
 void garage_hw_pulse_relay_open(void) { 
     LOGF("garage_hw: pulse open (stub)\n"); 
-    toggle_pin(PIN_STOP_BTN);
     toggle_pin(PIN_UP_BTN);
     garage_control_blink_debug_led(GARAGE_LED_FAST, 10);
 }
 void garage_hw_pulse_relay_close(void) { 
     LOGF("garage_hw: pulse close (stub)\n"); 
-    toggle_pin(PIN_STOP_BTN);
     toggle_pin(PIN_DOWN_BTN);
     garage_control_blink_debug_led(GARAGE_LED_SLOW, 2);
+}
+
+void garage_hw_pulse_relay_stop(void) { 
+    LOGF("garage_hw: pulse stop (stub)\n"); 
+    toggle_pin(PIN_STOP_BTN);
+    garage_control_blink_debug_led(GARAGE_LED_SLOW, 5);
 }
 
 /* Optional hook to set the debug LED state. Override in board code if needed.
@@ -178,6 +182,12 @@ void garage_control_command_close(void)
     xQueueSend(g_cmd_queue, &m, 0);
 }
 
+void garage_control_command_stop(void)
+{
+    if (!g_cmd_queue) return;
+    gc_cmd_msg_t m = { .cmd = GC_CMD_STOP, .arg = 0 };
+    xQueueSend(g_cmd_queue, &m, 0);
+}
 
 
 
@@ -199,6 +209,14 @@ static void start_close_sequence(void)
     g_move_start_ms = xTaskGetTickCount() * portTICK_RATE_MS;
     emit_state_event();
     garage_hw_pulse_relay_close();
+}
+
+static void start_stop_sequence(void)
+{
+    garage_hw_pulse_relay_stop();
+    g_control_state = GARAGE_CONTROL_IDLE;
+    g_logical_state = SENSOR_UNKNOWN; /* can't be sure */
+    emit_state_event();
 }
 
 static void close_timer_cb(xTimerHandle t)
@@ -253,6 +271,10 @@ static void gc_task(void *pv)
             case GC_CMD_CLOSE:
                 // When issueing a close command the sensor state open should not trigger the close timer for another x seconds
                 start_close_sequence();
+                break;
+            case GC_CMD_STOP:
+                // Stop any ongoing movement
+                start_stop_sequence();
                 break;
             }
         }

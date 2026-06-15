@@ -40,6 +40,7 @@ void garage_control_init(void);
 /* Commands (called by MQTT handler or UI). Non-blocking; only explicit open/close. */
 void garage_control_command_open(void);
 void garage_control_command_close(void);
+void garage_control_command_stop(void);
 
 /* Query current logical state (thread-safe snapshot). */
 /* Query current logical state snapshot. */

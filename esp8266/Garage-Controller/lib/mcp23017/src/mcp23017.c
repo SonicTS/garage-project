@@ -154,6 +154,10 @@ int mcp23017_init() {
 
     I2C_MASTER_SDA_HIGH_SCL_HIGH();
 
+	os_delay_us(1000);
+
+	printf("GPIO5=%d\n", GPIO_INPUT_GET(5));
+
 //    ETS_GPIO_INTR_ENABLE() ;
     ETS_INTR_UNLOCK();
 	uint8 i;
@@ -177,6 +181,6 @@ int mcp23017_init() {
 
     // reset all
     i2c_master_stop();
-	// scan_i2c_bus(); // Optional: scan bus to verify device presence
+	scan_i2c_bus(); // Optional: scan bus to verify device presence
 	return 0;
 }

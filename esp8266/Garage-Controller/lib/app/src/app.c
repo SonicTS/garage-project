@@ -27,11 +27,12 @@ static void mqtt_command_handler(const char *topic,
     }
     preview[n] = '\0';
     LOGF("mqtt: command on topic \"%s\": %s\n", topic, preview);
-    mqtt_client_publish_status("ack", "received");
     /* Interpret simple commands */
     if (strncmp(preview, "OPEN", 4) == 0 || strncmp(preview, "open", 4) == 0) {
+    mqtt_client_publish_status("ack", "opening");
         garage_control_command_open();
     } else if (strncmp(preview, "CLOSE_AFTER:", 12) == 0 || strncmp(preview, "close_after:", 12) == 0) {
+        mqtt_client_publish_status("ack", "setting_close_after");
         int seconds = atoi(preview + 12);
         if (seconds >= 0) {
             config_store_set_garage_close_after((uint32_t)seconds);
@@ -40,8 +41,15 @@ static void mqtt_command_handler(const char *topic,
         }
         
     } else if (strncmp(preview, "CLOSE", 5) == 0 || strncmp(preview, "close", 5) == 0) {
+        mqtt_client_publish_status("ack", "closing");
         garage_control_command_close();
-    } 
+    } else if (strncmp(preview, "STOP", 4) == 0 || strncmp(preview, "stop", 4) == 0) {
+        mqtt_client_publish_status("ack", "stopping");
+        garage_control_command_stop();
+    } else {
+        mqtt_client_publish_status("ack", "invalid_command");
+        LOGF("mqtt: unknown command received: %s\n", preview);
+    }
 }
 
 void init_uart_for_debug(void)
