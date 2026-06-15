@@ -23,6 +23,9 @@
 			"queue.h": "c",
 			"stdint.h": "c",
 			"mqtt.h": "c"
+		},
+		"chat.tools.terminal.autoApprove": {
+			"pio": true
 		}
 	}
 }
